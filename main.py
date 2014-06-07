@@ -11,13 +11,8 @@ RED = (255, 0, 0)
 BLACK = (0, 0, 0)
 TRANSPARENT = (0, 0, 0, 0)
 
-DIRECT_DICT = {pg.K_LEFT  : (-1, 0),
-               pg.K_RIGHT : ( 1, 0),
-               pg.K_UP    : ( 0,-1),
-               pg.K_DOWN  : ( 0, 1)}
-
-CONFIG = {'speed': 100,
-          'turn_rate': 0.5}
+CONFIG = {'thrustRate': 1,
+          'turnRate': 10}
 
 
 class Player(object):
@@ -36,47 +31,63 @@ class Player(object):
         self.rect = self.image.get_rect()
         # self.rect.center = (0, 0)
 
-        self.position = list(self.rect.center)
-        self.speed = config['speed']
-        self.turn_rate = config['turn_rate']
-        self.angle = 0
+        self.position = [0, 0]
+        self.velocity = [0, 0]
+        self.thrustRate = config['thrustRate']
+        self.turnRate = config['turnRate']
+        self.heading = 0
 
-    def update_center(self):
+        self.inputDict = {pg.K_LEFT:  'LEFT',
+                          pg.K_RIGHT: 'RIGHT',
+                          pg.K_UP:    'UP',
+                          pg.K_DOWN:  'DOWN'}
+
+    def updateCenter(self):
         oldCenter = self.rect.center
-        self.image = pg.transform.rotate(self.imageMaster, self.angle)
+        self.image = pg.transform.rotate(self.imageMaster, self.heading)
         self.rect = self.image.get_rect()
         self.rect.center = oldCenter
+
+    def controlPlayer(self, keys, dt):
+        for key in self.inputDict:                      # If the key is a valid input
+            if keys[key]:                               # and if you press the key
+                if key == pg.K_LEFT:
+                    self.turn(-self.turnRate, dt)
+                if key == pg.K_RIGHT:
+                    self.turn(self.turnRate, dt)
+                if key == pg.K_UP:
+                    self.thrust(-self.thrustRate, dt)
+                if key == pg.K_DOWN:
+                    print('K_DOWN')
+
+    def turn(self, rot, dt):
+        """Rotates player."""
+
+        frame_speed = self.thrustRate * dt
+        self.heading -= rot * frame_speed * self.turnRate
+        self.heading %= 360
+        self.updateCenter()
+
+    def thrust(self, delv, dt):
+        """Changes the velocity of the player."""
+
+        final_speed = delv * self.thrustRate * dt
+        heading_in_radians = math.radians(self.heading)
+        self.velocity[0] += math.sin(heading_in_radians) * final_speed
+        self.velocity[1] += math.cos(heading_in_radians) * final_speed
 
     def update(self, screen_rect, keys, dt):
         """Updates our player appropriately every frame."""
 
-        # Calculate input vector, normalize
-        vector = [0, 0]
-        for key in DIRECT_DICT:
-            if keys[key]:
-                vector[0] += DIRECT_DICT[key][0]
-                vector[1] += DIRECT_DICT[key][1]
-        frame_speed = self.speed * dt
+        # Update heading and velocity
+        self.controlPlayer(keys, dt)
 
-        # Rotate player image
-        self.angle -= vector[0] * frame_speed * self.turn_rate
-        self.update_center()
-
-        # Transform to radians
-        angle_in_radians = math.radians(self.angle)
-        final_speed = vector[1] * frame_speed
-
-        # position the player
-        self.position[0] += math.sin(angle_in_radians) * final_speed
-        self.position[1] += math.cos(angle_in_radians) * final_speed
+        # Update position
+        self.position[0] += self.velocity[0]
+        self.position[1] += self.velocity[1]
         self.rect.center = self.position
 
-        # Make sure that you're bound in the screen
-        if not screen_rect.contains(self.rect):
-            self.rect.clamp_ip(screen_rect)
-            self.position = list(self.rect.center)
-
-        print(self.rect.center, self.image.get_rect())
+        print(self.rect.center, self.heading)
 
     def draw(self, surface):
         """Draws the player to the target surface."""
