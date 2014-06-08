@@ -58,7 +58,34 @@ class Player(object):
                 if key == pg.K_UP:
                     self.thrust(-self.thrustRate, dt)
                 if key == pg.K_DOWN:
-                    print('K_DOWN')
+                    a = self.calculateAntiVelocityVector()
+                    self.turn(a, dt)
+
+    def calculateAntiVelocityVector(self):
+        if self.velocity[0] < 0:
+            angle = math.degrees(math.atan2(self.velocity[0],self.velocity[1]))
+            if angle <= 0:
+                angle -= self.heading
+            elif angle > 0:
+                angle += self.heading
+        else:
+            angle = -math.degrees(math.atan2(self.velocity[0],self.velocity[1]))
+            if angle <= 0:
+                angle += self.heading
+            elif angle > 0:
+                angle -= self.heading    
+
+
+        angle = abs(angle)
+        angle %= 360
+
+        print(self.velocity, self.heading, angle)
+
+        if abs(angle) > self.turnRate:
+            angle = math.copysign(1, angle) * self.turnRate
+
+        # print(self.heading, angle)
+        return angle
 
     def turn(self, rot, dt):
         """Rotates player."""
@@ -87,7 +114,7 @@ class Player(object):
         self.position[1] += self.velocity[1]
         self.rect.center = self.position
 
-        print(self.rect.center, self.heading)
+        # print(self.rect.center, self.heading)
 
     def draw(self, surface):
         """Draws the player to the target surface."""
