@@ -49,61 +49,56 @@ class Player(object):
         self.rect.center = oldCenter
 
     def controlPlayer(self, keys, dt):
-        for key in self.inputDict:                      # If the key is a valid input
-            if keys[key]:                               # and if you press the key
-                if key == pg.K_LEFT:
+        for key in self.inputDict:
+            # If the key is a valid input...
+            if keys[key]:
+                # ...do the appropriate thing.
+                if key == pg.K_DOWN:
+                    self.reverse(dt)
+                    break
+                elif key == pg.K_LEFT:
                     self.turn(-self.turnRate, dt)
-                if key == pg.K_RIGHT:
+                elif key == pg.K_RIGHT:
                     self.turn(self.turnRate, dt)
                 if key == pg.K_UP:
                     self.thrust(-self.thrustRate, dt)
-                if key == pg.K_DOWN:
-                    a = self.calculateAntiVelocityVector()
-                    self.turn(a, dt)
 
-    def calculateAntiVelocityVector(self):
-        if self.velocity[0] < 0:
-            angle = math.degrees(math.atan2(self.velocity[0],self.velocity[1]))
-            if angle <= 0:
-                angle -= self.heading
-            elif angle > 0:
-                angle += self.heading
+    def reverse(self, dt):
+        """Rotates player to face backwards along their velocity vector."""
+
+        antiVelocityAngle = math.degrees(
+            math.atan2(self.velocity[0], self.velocity[1]))
+        calculationAngle = -antiVelocityAngle + self.heading
+
+        calculationAngle %= 360
+
+        # Don't take the long way around.
+        if calculationAngle > 180:
+            outputAngle = -calculationAngle
         else:
-            angle = -math.degrees(math.atan2(self.velocity[0],self.velocity[1]))
-            if angle <= 0:
-                angle += self.heading
-            elif angle > 0:
-                angle -= self.heading    
+            outputAngle = calculationAngle
 
-
-        angle = abs(angle)
-        angle %= 360
-
-        print(self.velocity, self.heading, angle)
-
-        if abs(angle) > self.turnRate:
-            angle = math.copysign(1, angle) * self.turnRate
-
-        # print(self.heading, angle)
-        return angle
+        self.turn(outputAngle, dt)
 
     def turn(self, rot, dt):
-        """Rotates player."""
+        """Rotates player by an arbitrary amount no greater than the turn rate."""
+        
+        rot = saturate(rot, self.turnRate)
+        finalRot = rot * self.turnRate * dt
 
-        frame_speed = self.thrustRate * dt
-        self.heading -= rot * frame_speed * self.turnRate
+        self.heading -= finalRot
         self.heading %= 360
         self.updateCenter()
 
-    def thrust(self, delv, dt):
+    def thrust(self, speed, dt):
         """Changes the velocity of the player."""
 
-        final_speed = delv * self.thrustRate * dt
-        heading_in_radians = math.radians(self.heading)
-        self.velocity[0] += math.sin(heading_in_radians) * final_speed
-        self.velocity[1] += math.cos(heading_in_radians) * final_speed
+        finalSpeed = speed * self.thrustRate * dt
+        headingInRadians = math.radians(self.heading)
+        self.velocity[0] += math.sin(headingInRadians) * finalSpeed
+        self.velocity[1] += math.cos(headingInRadians) * finalSpeed
 
-    def update(self, screen_rect, keys, dt):
+    def update(self, keys, dt):
         """Updates our player appropriately every frame."""
 
         # Update heading and velocity
@@ -114,11 +109,20 @@ class Player(object):
         self.position[1] += self.velocity[1]
         self.rect.center = self.position
 
-        # print(self.rect.center, self.heading)
-
     def draw(self, surface):
         """Draws the player to the target surface."""
         surface.blit(self.image, self.rect)
+
+
+def saturate(var, saturation):
+    if var > saturation:
+        output = saturation
+    elif var < -saturation:
+        output = -saturation
+    else:
+        output = var
+
+    return output
 
 
 class Control(object):
@@ -130,39 +134,39 @@ class Control(object):
         pg.init()
         pg.display.set_caption("pySpace")
         self.screen = pg.display.set_mode(SCREEN_SIZE)
-        self.screen_rect = self.screen.get_rect()
+        self.screenRect = self.screen.get_rect()
         self.clock = pg.time.Clock()
         self.fps = 60.0
         self.done = False
         self.keys = pg.key.get_pressed()
-        self.player = self.make_player()
+        self.player = self.makePlayer()
 
-    def make_player(self):
+    def makePlayer(self):
         """Create a player and set player.position and player.rect.center equal."""
         player = Player(CONFIG)
-        player.position = list(self.screen_rect.center)
+        player.position = list(self.screenRect.center)
         return player
 
-    def event_loop(self):
+    def eventLoop(self):
         """One event loop. Never cut your game off from the event loop."""
         for event in pg.event.get():
             self.keys = pg.key.get_pressed()
             if event.type == pg.QUIT or self.keys[pg.K_ESCAPE]:
                 self.done = True
 
-    def main_loop(self):
+    def mainLoop(self):
         """One game loop. Simple and clean."""
         while not self.done:
-            time_delta = self.clock.tick(self.fps) / 1000.0
-            self.event_loop()
-            self.player.update(self.screen_rect, self.keys, time_delta)
+            dt = self.clock.tick(self.fps) / 1000.0
+            self.eventLoop()
+            self.player.update(self.keys, dt)
             self.screen.fill(BLACK)
             self.player.draw(self.screen)
             pg.display.update()
 
 
 if __name__ == "__main__":
-    run_it = Control()
-    run_it.main_loop()
+    run = Control()
+    run.mainLoop()
     pg.quit()
     sys.exit()
