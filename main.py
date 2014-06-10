@@ -14,9 +14,40 @@ TRANSPARENT = (0, 0, 0, 0)
 CONFIG = {'thrustRate': 1,
           'turnRate': 180}
 
-spaceCount = 0
+lastTime = 0
 
-class Player(object):
+class Bullet(pg.sprite.Sprite):
+
+    def __init__(self, destination, origin):
+        pg.sprite.Sprite.__init__(self)
+
+        self.image = pg.Surface([10, 10])
+        self.image.fill(RED)
+
+        self.destination_x, self.destination_y = destination[0], destination[1]
+        self.origin = origin
+
+        self.rect = self.image.get_rect()
+        self.rect.x, self.rect.y = origin[0], origin[1]
+
+    def update(self, keys, dt):
+        speed = -4.
+        maxRange = 200
+        distance = [self.destination_x - self.origin[0],
+                    self.destination_y - self.origin[1]]
+        norm = math.sqrt(distance[0] ** 2 + distance[1] ** 2)
+        direction = [distance[0] / norm, distance[1] / norm]
+        bullet_vector = [direction[0] * speed, direction[1] * speed]
+
+        self.rect.x -= bullet_vector[0]
+        self.rect.y -= bullet_vector[1]
+
+        # print(norm)
+        if norm > maxRange:
+            run.allSpritesList.remove(self)
+
+
+class Player(pg.sprite.Sprite):
 
     """This class will represent our user controlled character."""
 
@@ -26,9 +57,8 @@ class Player(object):
         rect (all rect style arguments accepted).
         """
         pg.sprite.Sprite.__init__(self)
-        self.imageMaster = pg.image.load("ship.bmp")
-        self.imageMaster = self.imageMaster.convert()
-        self.imageMaster = pg.transform.smoothscale(self.imageMaster, (66, 52))
+        temp = pg.image.load("ship.bmp")
+        self.imageMaster = pg.transform.smoothscale(temp.convert(), (66, 52))
         self.image = self.imageMaster
         self.rect = self.image.get_rect()
         # self.rect.center = (0, 0)
@@ -38,6 +68,8 @@ class Player(object):
         self.thrustRate = config['thrustRate']
         self.turnRate = config['turnRate']
         self.heading = 0
+
+        self.lastFired = 0
 
         self.inputDict = {pg.K_LEFT:  'LEFT',
                           pg.K_RIGHT: 'RIGHT',
@@ -52,25 +84,37 @@ class Player(object):
         self.rect.center = oldCenter
 
     def controlPlayer(self, keys, dt):
-        global spaceCount
-
+        reverse = False
         for key in self.inputDict:
             # If the key is a valid input...
             if keys[key]:
                 # ...do the appropriate thing.
                 if key == pg.K_DOWN:
                     self.reverse(dt)
-                    break
-                elif key == pg.K_LEFT:
-                    self.turn(-self.turnRate, dt)
-                elif key == pg.K_RIGHT:
-                    self.turn(self.turnRate, dt)
+                    reverse = True
+                if not reverse:
+                    if key == pg.K_RIGHT:
+                        self.turn(self.turnRate, dt)
+                    if key == pg.K_LEFT:
+                        self.turn(-self.turnRate, dt)
                 if key == pg.K_UP:
                     self.thrust(-self.thrustRate, dt)
                 if key == pg.K_SPACE:
-                    spaceCount += 1
-                    print(spaceCount)
-                    break;
+                    self.fire()
+
+    def fire(self):
+        global lastTime
+        currentTime = pg.time.get_ticks()
+        if currentTime - lastTime > 1000:
+            a = [self.position[0] - math.sin(math.degrees(self.heading)),
+                 self.position[1] - math.cos(math.degrees(self.heading))]
+            b = [self.position[0], self.position[1]]
+            bullet = Bullet(a, b)
+
+            run.allSpritesList.add(bullet)
+            # print('pew', lastTime, currentTime, currentTime-lastTime)
+            # print(run.allSpritesList)
+            lastTime = currentTime
 
     def reverse(self, dt):
         """Rotates player to face backwards along their velocity vector."""
@@ -92,7 +136,7 @@ class Player(object):
 
     def turn(self, rot, dt):
         """Rotates player by an arbitrary amount no greater than the turn rate."""
-        
+
         self.heading -= saturate(rot, self.turnRate, dt) * dt
         self.heading %= 360
         self.updateCenter()
@@ -124,12 +168,12 @@ class Player(object):
 def saturate(var, saturation, dt=1.):
     """Saturates a value within even bounds."""
 
-    if var/dt > saturation:
+    if var / dt > saturation:
         output = saturation
-    elif var/dt < -saturation:
+    elif var / dt < -saturation:
         output = -saturation
     else:
-        output = var/dt
+        output = var / dt
 
     return output
 
@@ -149,6 +193,8 @@ class Control(object):
         self.done = False
         self.keys = pg.key.get_pressed()
         self.player = self.makePlayer()
+        self.allSpritesList = pg.sprite.Group()
+        self.allSpritesList.add(self.player)
 
     def makePlayer(self):
         """Create a player and set player.position and player.rect.center equal."""
@@ -158,6 +204,10 @@ class Control(object):
 
     def eventLoop(self):
         """Single event loop."""
+
+        # gets coordinates of mouse if the game window is the active window
+        # if (pg.mouse.get_focused()): print(pg.mouse.get_pos())
+
         for event in pg.event.get():
             self.keys = pg.key.get_pressed()
             if event.type == pg.QUIT or self.keys[pg.K_ESCAPE]:
@@ -168,11 +218,10 @@ class Control(object):
         while not self.done:
             dt = self.clock.tick(self.fps) / 1000.0
             self.eventLoop()
-            self.player.update(self.keys, dt)
+            self.allSpritesList.update(self.keys, dt)
             self.screen.fill(BLACK)
-            self.player.draw(self.screen)
+            self.allSpritesList.draw(self.screen)
             pg.display.update()
-
 
 if __name__ == "__main__":
     run = Control()
