@@ -12,8 +12,9 @@ BLACK = (0, 0, 0)
 TRANSPARENT = (0, 0, 0, 0)
 
 CONFIG = {'thrustRate': 1,
-          'turnRate': 10}
+          'turnRate': 180}
 
+spaceCount = 0
 
 class Player(object):
 
@@ -27,6 +28,7 @@ class Player(object):
         pg.sprite.Sprite.__init__(self)
         self.imageMaster = pg.image.load("ship.bmp")
         self.imageMaster = self.imageMaster.convert()
+        self.imageMaster = pg.transform.smoothscale(self.imageMaster, (66, 52))
         self.image = self.imageMaster
         self.rect = self.image.get_rect()
         # self.rect.center = (0, 0)
@@ -40,7 +42,8 @@ class Player(object):
         self.inputDict = {pg.K_LEFT:  'LEFT',
                           pg.K_RIGHT: 'RIGHT',
                           pg.K_UP:    'UP',
-                          pg.K_DOWN:  'DOWN'}
+                          pg.K_DOWN:  'DOWN',
+                          pg.K_SPACE: 'SPACE'}
 
     def updateCenter(self):
         oldCenter = self.rect.center
@@ -49,6 +52,8 @@ class Player(object):
         self.rect.center = oldCenter
 
     def controlPlayer(self, keys, dt):
+        global spaceCount
+
         for key in self.inputDict:
             # If the key is a valid input...
             if keys[key]:
@@ -62,6 +67,10 @@ class Player(object):
                     self.turn(self.turnRate, dt)
                 if key == pg.K_UP:
                     self.thrust(-self.thrustRate, dt)
+                if key == pg.K_SPACE:
+                    spaceCount += 1
+                    print(spaceCount)
+                    break;
 
     def reverse(self, dt):
         """Rotates player to face backwards along their velocity vector."""
@@ -70,6 +79,7 @@ class Player(object):
             math.atan2(self.velocity[0], self.velocity[1]))
         calculationAngle = -antiVelocityAngle + self.heading
 
+        # 0 degrees = 360 degrees
         calculationAngle %= 360
 
         # Don't take the long way around.
@@ -83,10 +93,7 @@ class Player(object):
     def turn(self, rot, dt):
         """Rotates player by an arbitrary amount no greater than the turn rate."""
         
-        rot = saturate(rot, self.turnRate)
-        finalRot = rot * self.turnRate * dt
-
-        self.heading -= finalRot
+        self.heading -= saturate(rot, self.turnRate, dt) * dt
         self.heading %= 360
         self.updateCenter()
 
@@ -114,13 +121,15 @@ class Player(object):
         surface.blit(self.image, self.rect)
 
 
-def saturate(var, saturation):
-    if var > saturation:
+def saturate(var, saturation, dt=1.):
+    """Saturates a value within even bounds."""
+
+    if var/dt > saturation:
         output = saturation
-    elif var < -saturation:
+    elif var/dt < -saturation:
         output = -saturation
     else:
-        output = var
+        output = var/dt
 
     return output
 
@@ -148,14 +157,14 @@ class Control(object):
         return player
 
     def eventLoop(self):
-        """One event loop. Never cut your game off from the event loop."""
+        """Single event loop."""
         for event in pg.event.get():
             self.keys = pg.key.get_pressed()
             if event.type == pg.QUIT or self.keys[pg.K_ESCAPE]:
                 self.done = True
 
     def mainLoop(self):
-        """One game loop. Simple and clean."""
+        """Game loop."""
         while not self.done:
             dt = self.clock.tick(self.fps) / 1000.0
             self.eventLoop()
