@@ -12,38 +12,38 @@ BLACK = (0, 0, 0)
 TRANSPARENT = (0, 0, 0, 0)
 
 CONFIG = {'thrustRate': 1,
-          'turnRate': 180}
+          'turnRate': 180,
+          'fireRate': 5}
 
-lastTime = 0
 
 class Bullet(pg.sprite.Sprite):
 
-    def __init__(self, destination, origin):
+    def __init__(self, origin, heading):
         pg.sprite.Sprite.__init__(self)
 
         self.image = pg.Surface([10, 10])
         self.image.fill(RED)
-
-        self.destination_x, self.destination_y = destination[0], destination[1]
-        self.origin = origin
-
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = origin[0], origin[1]
+
+        self.origin = origin
+        self.heading = heading
 
     def update(self, keys, dt):
         speed = -4.
         maxRange = 200
-        distance = [self.destination_x - self.origin[0],
-                    self.destination_y - self.origin[1]]
-        norm = math.sqrt(distance[0] ** 2 + distance[1] ** 2)
-        direction = [distance[0] / norm, distance[1] / norm]
-        bullet_vector = [direction[0] * speed, direction[1] * speed]
 
-        self.rect.x -= bullet_vector[0]
-        self.rect.y -= bullet_vector[1]
+        bullet_vector = [speed * math.sin(math.radians(self.heading)),
+                         speed * math.cos(math.radians(self.heading))]
+        self.rect.x += bullet_vector[0]
+        self.rect.y += bullet_vector[1]
 
-        # print(norm)
-        if norm > maxRange:
+        distance = [self.rect.x - self.origin[0],
+                    self.rect.y - self.origin[1]]
+
+        distanceTravelled = math.sqrt(distance[0] ** 2 + distance[1] ** 2)
+
+        if distanceTravelled >= maxRange:
             run.allSpritesList.remove(self)
 
 
@@ -63,12 +63,14 @@ class Player(pg.sprite.Sprite):
         self.rect = self.image.get_rect()
         # self.rect.center = (0, 0)
 
+        self.thrustRate = config['thrustRate']
         self.position = [0, 0]
         self.velocity = [0, 0]
-        self.thrustRate = config['thrustRate']
+
         self.turnRate = config['turnRate']
         self.heading = 0
 
+        self.fireRate = config['fireRate']
         self.lastFired = 0
 
         self.inputDict = {pg.K_LEFT:  'LEFT',
@@ -103,18 +105,14 @@ class Player(pg.sprite.Sprite):
                     self.fire()
 
     def fire(self):
-        global lastTime
         currentTime = pg.time.get_ticks()
-        if currentTime - lastTime > 1000:
-            a = [self.position[0] - math.sin(math.degrees(self.heading)),
-                 self.position[1] - math.cos(math.degrees(self.heading))]
+        if currentTime - self.lastFired > 1000. / self.fireRate:
             b = [self.position[0], self.position[1]]
-            bullet = Bullet(a, b)
+            c = self.heading
+            bullet = Bullet(b, c)
 
             run.allSpritesList.add(bullet)
-            # print('pew', lastTime, currentTime, currentTime-lastTime)
-            # print(run.allSpritesList)
-            lastTime = currentTime
+            self.lastFired = currentTime
 
     def reverse(self, dt):
         """Rotates player to face backwards along their velocity vector."""
